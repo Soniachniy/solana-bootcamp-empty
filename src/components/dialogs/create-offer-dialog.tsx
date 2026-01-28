@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowDownUp } from "lucide-react";
+import { Loader2, ArrowDownUp, CheckCircle, XCircle } from "lucide-react";
 
 import { toast } from "sonner";
 import { EscrowProgram } from "@/solana-service/program";
@@ -26,7 +26,7 @@ import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { useAnchorWallet, useWallet } from "@solana/wallet-adapter-react";
 
-import { Wallet } from "@coral-xyz/anchor";
+import { BN, Wallet } from "@coral-xyz/anchor";
 import { METADATA } from "@/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMetadata } from "@/hooks/useMetadata";
@@ -36,6 +36,7 @@ const DEFAULT_FORM_DATA = {
   tokenB: METADATA["GdHsojisNu8RH92k4JzF1ULzutZgfg8WRL5cHkoW2HCK"].address,
   amountA: "0",
   amountB: "0",
+  offerId: "",
 };
 interface CreateOfferDialogProps {
   isWalletConnected: boolean;
@@ -46,12 +47,35 @@ export function CreateOfferDialog({
 }: CreateOfferDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingId, setIsCheckingId] = useState(false);
+  const [idAvailable, setIdAvailable] = useState<boolean | null>(null);
   const { connect, wallets, select } = useWallet();
   const wallet = useAnchorWallet();
   const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
   const queryClient = useQueryClient();
   const { data: firstTokenMetadata } = useMetadata(formData.tokenA);
   const { data: secondTokenMetadata } = useMetadata(formData.tokenB);
+
+  const checkOfferIdAvailability = async (offerId: string) => {
+    if (!offerId || !wallet) {
+      setIdAvailable(null);
+      return;
+    }
+
+    try {
+      setIsCheckingId(true);
+      const connection = new Connection(
+        clusterApiUrl(WalletAdapterNetwork.Devnet)
+      );
+      const contract = new EscrowProgram(connection, wallet as Wallet);
+      const exists = await contract.checkOfferExists(new BN(offerId));
+      setIdAvailable(!exists);
+    } catch (e) {
+      setIdAvailable(null);
+    } finally {
+      setIsCheckingId(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,8 +86,13 @@ export function CreateOfferDialog({
       return;
     }
 
-    if (!formData.amountA || !formData.amountB) {
-      toast("Missing information");
+    if (!formData.amountA || !formData.amountB || !formData.offerId) {
+      toast("Missing information - please fill all fields including Offer ID");
+      return;
+    }
+
+    if (idAvailable === false) {
+      toast("Offer ID is already taken, please choose a different number");
       return;
     }
 
@@ -80,7 +109,8 @@ export function CreateOfferDialog({
         new PublicKey(formData.tokenA),
         new PublicKey(formData.tokenB),
         Number(formData.amountA),
-        Number(formData.amountB)
+        Number(formData.amountB),
+        formData.offerId
       );
       if (!response) {
         toast("Error creating Offer");
@@ -93,7 +123,7 @@ export function CreateOfferDialog({
     } catch (error) {
       toast("Error creating Offer");
     } finally {
-      await queryClient.invalidateQueries({ queryKey: ["offers"] });
+      queryClient.invalidateQueries({ queryKey: ["offers"] });
       setIsSubmitting(false);
     }
   };
@@ -115,11 +145,27 @@ export function CreateOfferDialog({
 
   const swapTokens = () => {
     setFormData((prev) => ({
+      ...prev,
       tokenA: prev.tokenB,
       tokenB: prev.tokenA,
       amountA: prev.amountB,
       amountB: prev.amountA,
     }));
+  };
+
+  const handleOfferIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      offerId: value,
+    }));
+    setIdAvailable(null);
+  };
+
+  const handleOfferIdBlur = () => {
+    if (formData.offerId && wallet) {
+      checkOfferIdAvailability(formData.offerId);
+    }
   };
 
   const calculateExchangeRate = () => {
@@ -238,9 +284,51 @@ export function CreateOfferDialog({
                 Exchange Rate: {calculateExchangeRate()}
               </div>
             )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="offerId">Offer ID (unique number)</Label>
+              <div className="flex gap-2 items-center">
+                <Input
+                  id="offerId"
+                  name="offerId"
+                  placeholder="Enter a unique number"
+                  type="number"
+                  min="0"
+                  value={formData.offerId}
+                  onChange={handleOfferIdChange}
+                  onBlur={handleOfferIdBlur}
+                  className="flex-1"
+                />
+                {isCheckingId && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+                {!isCheckingId && idAvailable === true && (
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                )}
+                {!isCheckingId && idAvailable === false && (
+                  <XCircle className="h-5 w-5 text-red-500" />
+                )}
+              </div>
+              {idAvailable === false && (
+                <p className="text-sm text-red-500">
+                  This Offer ID is already taken. Please choose a different number.
+                </p>
+              )}
+              {idAvailable === true && (
+                <p className="text-sm text-green-600">
+                  This Offer ID is available.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Share this number with others so they can find your offer.
+              </p>
+            </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              disabled={isSubmitting || isCheckingId || idAvailable === false}
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

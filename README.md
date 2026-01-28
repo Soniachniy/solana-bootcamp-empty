@@ -7,7 +7,7 @@ A modern React-based frontend application for interacting with Solana Escrow sma
 ## Features
 
 - 🔐 Wallet Integration with multiple wallet providers (Phantom, Solflare, etc.)
-- 💱 Create escrow offers with SPL tokens
+- 💱 Create escrow offers with any SPL Token
 - 📋 View and manage your created offers
 - 🔄 Take open offers from other users
 - 📱 Responsive and modern UI using Tailwind CSS and shadcn

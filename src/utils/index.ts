@@ -1,5 +1,4 @@
 import { clsx, type ClassValue } from "clsx";
-import { gql } from "graphql-request";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -23,64 +22,6 @@ export const METADATA = {
     symbol: "Burger",
   },
 };
-
-export const query = gql`
-  {
-    offers(first: 100) {
-      id
-      closed
-      trxHashOffer
-      trxHashTake
-
-      tokenAOfferedAmount
-      tokenBWantedAmount
-
-      acctMaker
-      acctTaker
-
-      acctTokenMintA
-      acctTokenMintB
-
-      acctMakerTokenAccountA
-      acctTakerTokenAccountA
-      acctTakerTokenAccountB
-      acctMakerTokenAccountB
-
-      acctOffer
-      acctVault
-      acctTokenProgram
-    }
-  }
-`;
-
-export const getUserOffers = (acctMaker: string) => gql`
-  {
-    offers(where: { acctMaker: "${acctMaker}" }) {
-      id
-      closed
-      trxHashOffer
-      trxHashTake
-
-      tokenAOfferedAmount
-      tokenBWantedAmount
-
-      acctMaker
-      acctTaker
-
-      acctTokenMintA
-      acctTokenMintB
-
-      acctMakerTokenAccountA
-      acctTakerTokenAccountA
-      acctTakerTokenAccountB
-      acctMakerTokenAccountB
-
-      acctOffer
-      acctVault
-      acctTokenProgram
-    }
-  }
-`;
 
 export const createPass = (walletAddress?: string | null) => {
   if (!walletAddress) return "Connect your wallet";
